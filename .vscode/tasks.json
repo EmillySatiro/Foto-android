@@ -1,0 +1,49 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compilar e Rodar Kotlin",
+			"type": "shell",
+			"command": "kotlinc ${file} -include-runtime -d ${fileDirname}/program.jar && java -jar ${fileDirname}/program.jar",
+			"options": {
+				"shell": {
+					"executable": "/bin/bash",
+					"args": ["-i", "-c"]
+				}
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Build APK",
+			"type": "shell",
+			"command": "./gradlew assembleDebug"
+		},
+		{
+			"label": "Deploy no celular",
+			"type": "shell",
+			"command": "adb install -r app/build/outputs/apk/debug/app-debug.apk"
+		},
+		{
+			"label": "Atualizar codigo no celular",
+			"type": "shell",
+			"command": "./gradlew installDebug",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		}
+	]
+}
