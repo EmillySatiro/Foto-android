@@ -1,3 +1,4 @@
+// Identificação do pacote do app
 package com.example.foto_android
 
 import android.Manifest
@@ -27,18 +28,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Pedir permissão de câmera se necessário
+        // Caso necessário, pede a permissão da câmera
         if (!hasCameraPermission()) {
             ActivityCompat.requestPermissions(
                 this, arrayOf(Manifest.permission.CAMERA), 0
             )
         }
 
+        // Inicia o Jetpack Compose
         setContent {
             CameraApp()
         }
     }
 
+    // Verifica se a permissão da câmera foi concedida
     private fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
@@ -47,16 +50,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Função que desenha a tela (com compose)
 @Composable
 fun CameraApp() {
+    // Guarda a imagem capturada
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var ipAddress by remember { mutableStateOf("192.168.0.100") }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        // Caso a foto tenha sido tirada com sucesso
         if (result.resultCode == Activity.RESULT_OK) {
-            val bitmap = result.data?.extras?.get("data") as Bitmap
+            // val bitmap = result.data?.extras?.get("data") as Bitmap
+            val bitmap = result.data?.extras?.getParcelable<Bitmap>("data")
             imageBitmap = bitmap
         }
     }
@@ -69,6 +76,7 @@ fun CameraApp() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Renderiza a imagem caso o bitmap já exista
         imageBitmap?.let { img ->
             Image(
                 bitmap = img.asImageBitmap(),
@@ -81,6 +89,7 @@ fun CameraApp() {
             Spacer(modifier = Modifier.height(16.dp)) 
         }
 
+        // Campo de texto (IP)
         OutlinedTextField(
             value = ipAddress,
             onValueChange = { ipAddress = it },
@@ -91,6 +100,7 @@ fun CameraApp() {
         // Espaço entre campo e botão
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Botão para tirar a foto e enviar pro ip definido
         Button(onClick = {
             val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             launcher.launch(intent)

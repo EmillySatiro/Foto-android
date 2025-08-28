@@ -25,6 +25,9 @@
 			"label": "Atualizar codigo no celular",
 			"type": "shell",
 			"command": "./gradlew installDebug",
+			"options": {
+				"cwd": "${workspaceFolder}/kotlin"
+			},
 			"group": {
 				"kind": "build",
 				"isDefault": true
