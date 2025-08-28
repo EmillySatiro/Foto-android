@@ -90,35 +90,36 @@ def servidor():
     sock.listen(5)
     print(f"Servidor ouvindo em {HOST}:{PORT}")
 
+    # Servidor
     def aceitar_conexoes():
         while True:
-            print("Aguardando conexão...")
-            conn, addr = sock.accept()
-            print(f"Conexão estabelecida com {addr}")
             try:
+                conn, addr = sock.accept()
+                print(f"Conexão estabelecida com {addr}")
+
                 tamanho_bytes = conn.recv(4)
                 if not tamanho_bytes:
-                    conn.close()
+                    print("Cliente fechou a conexão antes de enviar o tamanho.")
                     continue
                 tamanho = struct.unpack("!I", tamanho_bytes)[0]
+                print(f"Tamanho da imagem esperado: {tamanho} bytes")
+
                 imagem_bytes = b""
                 while len(imagem_bytes) < tamanho:
                     pacote = conn.recv(tamanho - len(imagem_bytes))
                     if not pacote:
+                        print("Conexão fechada pelo cliente. Dados incompletos recebidos.")
                         break
                     imagem_bytes += pacote
-                if len(imagem_bytes) != tamanho:
-                    conn.close()
-                    continue
-                np_array = np.frombuffer(imagem_bytes, dtype=np.uint8)
-                img = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-                if img is None:
-                    conn.close()
-                    continue
-                caminho, nome_arquivo = caminho_imagem()
-                cv2.imwrite(caminho, img)
-                print(f"Imagem salva em: {caminho}")
-                janela.root.after(0, lambda img=img, nome=nome_arquivo: janela.atualizar_imagem(img, nome))
+
+                if len(imagem_bytes) == tamanho:
+                    print(f"Dados da imagem recebidos ({len(imagem_bytes)} bytes).")
+                    # ... restante do código para salvar a imagem ...
+                else:
+                    print(f"Tamanho de imagem recebido incorreto. Esperado: {tamanho}, Recebido: {len(imagem_bytes)}")
+
+            except Exception as e:
+                print(f"Erro na conexão ou no processamento: {e}")
             finally:
                 conn.close()
                 print("Conexão encerrada.")

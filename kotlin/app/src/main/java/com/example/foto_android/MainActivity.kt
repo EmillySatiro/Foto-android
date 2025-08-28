@@ -28,7 +28,9 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-
+import java.io.DataOutputStream
+import java.net.Socket
+import java.nio.ByteBuffer
 
 class MainActivity : ComponentActivity() {
 
@@ -57,41 +59,38 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Função para enviar a imagem para o servidor
-fun sendImageToServer(bitmap: Bitmap, ip: String) {
+
+// Dentro da função sendImageToServer
+fun sendImageToServer(bitmap: Bitmap, ip: String, port: Int = 5001) {
     CoroutineScope(Dispatchers.IO).launch {
         try {
-            val url = URL("http://$ip/upload")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.doOutput = true
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "image/jpeg")
-
-            // Converte o bitmap para JPEG
+            Log.d("FotoAndroid", "Iniciando envio para IP: $ip na porta: $port")
             val stream = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
             val byteArray = stream.toByteArray()
 
-            // Envia os bytes
-            val outputStream: OutputStream = connection.outputStream
+            Log.d("FotoAndroid", "Tamanho da imagem em bytes: ${byteArray.size}")
+
+            val socket = Socket(ip, port)
+            Log.d("FotoAndroid", "Conexão com o servidor estabelecida.")
+
+            val outputStream = DataOutputStream(socket.getOutputStream())
+            outputStream.writeInt(byteArray.size) // Use writeInt para simplificar
             outputStream.write(byteArray)
             outputStream.flush()
-            outputStream.close()
 
-            val responseCode = connection.responseCode
-            Log.d("FotoAndroid", "Resposta do servidor: $responseCode")
-            connection.disconnect()
+            socket.close()
+            Log.d("FotoAndroid", "Imagem enviada com sucesso!")
         } catch (e: Exception) {
-            Log.e("FotoAndroid", "Erro ao enviar imagem: ${e.message}")
+            Log.e("FotoAndroid", "Erro ao enviar imagem: ${e.message}", e)
         }
     }
 }
-
 // Função que desenha a tela (com compose)
 @Composable
 fun CameraApp() {
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var ipAddress by remember { mutableStateOf("192.168.0.100") }
+    var ipAddress by remember { mutableStateOf("10.180.43.210") }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
