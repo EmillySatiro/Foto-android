@@ -89,32 +89,43 @@ def servidor():
     sock.bind((HOST, PORT))
     sock.listen(5)
     print(f"Servidor ouvindo em {HOST}:{PORT}")
+    wifi_ip = get_wifi_ip()
+    print("Meu IP Wi-Fi:", wifi_ip)
 
     def aceitar_conexoes():
         while True:
-            print("Aguardando conexão...")
+            print("\nAguardando conexão...")
             conn, addr = sock.accept()
             print(f"Conexão estabelecida com {addr}")
             try:
                 tamanho_bytes = conn.recv(4)
-                if not tamanho_bytes:
+                if not tamanho_bytes or len(tamanho_bytes) < 4:
+                    print("Erro: não recebeu 4 bytes de tamanho da imagem")
                     conn.close()
                     continue
+
                 tamanho = struct.unpack("!I", tamanho_bytes)[0]
+
                 imagem_bytes = b""
                 while len(imagem_bytes) < tamanho:
                     pacote = conn.recv(tamanho - len(imagem_bytes))
                     if not pacote:
                         break
                     imagem_bytes += pacote
+
                 if len(imagem_bytes) != tamanho:
+                    print("Erro: não recebeu todos os bytes da imagem")
                     conn.close()
                     continue
+
                 np_array = np.frombuffer(imagem_bytes, dtype=np.uint8)
                 img = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+
                 if img is None:
+                    print("Erro: os bytes recebidos não formam uma imagem válida")
                     conn.close()
                     continue
+
                 caminho, nome_arquivo = caminho_imagem()
                 cv2.imwrite(caminho, img)
                 print(f"Imagem salva em: {caminho}")
@@ -125,6 +136,15 @@ def servidor():
 
     Thread(target=aceitar_conexoes, daemon=True).start()
     janela.root.mainloop()
+
+def get_wifi_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
 
 if __name__ == "__main__":
     servidor()
