@@ -15,12 +15,27 @@ Abaixo estão os passos para rodar cada parte do sistema.
    cd servidor
    ```
 
-2. Instale as dependências listadas em `requirements.txt`:
+2. Crie um ambiente virtual Python (recomendado):
+   ```bash
+   python -m venv .venv
+   ```
+
+3. Ative o ambiente virtual:
+   - **Linux/macOS**:
+     ```bash
+     source .venv/bin/activate
+     ```
+   - **Windows (PowerShell)**:
+     ```powershell
+     .venv\Scripts\Activate.ps1
+     ```
+
+4. Instale as dependências listadas em `requirements.txt`:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Execute o servidor:
+5. Execute o servidor:
    ```bash
    python server.py
    ```
