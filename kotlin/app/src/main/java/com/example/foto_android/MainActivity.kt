@@ -87,6 +87,7 @@ fun CameraApp() {
     val context = LocalContext.current
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var ipAddress by remember { mutableStateOf("10.180.43.210") }
+    var port by remember { mutableStateOf("5001") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
 
     // Lançador da câmera
@@ -136,6 +137,18 @@ fun CameraApp() {
             modifier = Modifier.fillMaxWidth()
         )
 
+        OutlinedTextField(
+            value = port,
+            onValueChange = { newValue ->
+                // Permite apenas dígitos
+                if (newValue.all { it.isDigit() }) {
+                    port = newValue
+                }
+            },
+            label = { Text("Porta do servidor") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(onClick = {
@@ -156,8 +169,9 @@ fun CameraApp() {
         Spacer(modifier = Modifier.height(16.dp))
 
         if (imageBitmap != null) {
+            val portInt = port.toIntOrNull() ?: 5001
             Button(onClick = {
-                sendImageToServer(imageBitmap!!, ipAddress)
+                sendImageToServer(imageBitmap!!, ipAddress, portInt)
             }) {
                 Text("Enviar para o Servidor")
             }
