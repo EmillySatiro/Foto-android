@@ -1,47 +1,57 @@
-// Identificação do pacote do app
 package com.example.foto_android
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import android.content.Intent
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.net.Socket
 import android.app.Activity
-import android.provider.MediaStore
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.ui.Alignment
+import android.content.Intent
+
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Caso necessário, pede a permissão da câmera
+        // Solicita permissão da câmera
         if (!hasCameraPermission()) {
             ActivityCompat.requestPermissions(
                 this, arrayOf(Manifest.permission.CAMERA), 0
             )
         }
 
-        // Inicia o Jetpack Compose
         setContent {
             CameraApp()
         }
     }
 
-    // Verifica se a permissão da câmera foi concedida
     private fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
@@ -50,33 +60,64 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Função que desenha a tela (com compose)
+// Envio da imagem para o servidor
+fun sendImageToServer(bitmap: Bitmap, ip: String, port: Int = 5001) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            Log.d("FotoAndroid", "Enviando imagem para $ip:$port")
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+            val byteArray = stream.toByteArray()
+
+            val socket = Socket(ip, port)
+            val outputStream = DataOutputStream(socket.getOutputStream())
+            outputStream.writeInt(byteArray.size)
+            outputStream.write(byteArray)
+            outputStream.flush()
+            socket.close()
+            Log.d("FotoAndroid", "Imagem enviada com sucesso")
+        } catch (e: Exception) {
+            Log.e("FotoAndroid", "Erro ao enviar imagem: ${e.message}", e)
+        }
+    }
+}
+
 @Composable
 fun CameraApp() {
-    // Guarda a imagem capturada
+    val context = LocalContext.current
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var ipAddress by remember { mutableStateOf("192.168.0.100") }
+    var ipAddress by remember { mutableStateOf("10.180.43.210") }
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Lançador da câmera
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        // Caso a foto tenha sido tirada com sucesso
-        if (result.resultCode == Activity.RESULT_OK) {
-            // val bitmap = result.data?.extras?.get("data") as Bitmap
-            val bitmap = result.data?.extras?.getParcelable<Bitmap>("data")
+        if (result.resultCode == Activity.RESULT_OK && photoUri != null) {
+            val bitmap = BitmapFactory.decodeStream(
+                context.contentResolver.openInputStream(photoUri!!)
+            )
             imageBitmap = bitmap
         }
+    }
+
+    // Cria arquivo temporário para salvar a foto completa
+    fun createImageFile(): File {
+        val storageDir: File = context.cacheDir
+        return File.createTempFile(
+            "foto_",
+            ".jpg",
+            storageDir
+        )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        // Alinhamento no centro (vertical e horizontal)
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Renderiza a imagem caso o bitmap já exista
         imageBitmap?.let { img ->
             Image(
                 bitmap = img.asImageBitmap(),
@@ -85,11 +126,9 @@ fun CameraApp() {
                     .fillMaxWidth()
                     .height(400.dp)
             )
-            // Espaço entre imagem e campo
-            Spacer(modifier = Modifier.height(16.dp)) 
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Campo de texto (IP)
         OutlinedTextField(
             value = ipAddress,
             onValueChange = { ipAddress = it },
@@ -97,16 +136,31 @@ fun CameraApp() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Espaço entre campo e botão
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Botão para tirar a foto e enviar pro ip definido
         Button(onClick = {
-            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            val photoFile = createImageFile()
+            photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                photoFile
+            )
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+            }
             launcher.launch(intent)
         }) {
-            Text("Tirar Foto e Enviar")
+            Text("Tirar Foto")
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (imageBitmap != null) {
+            Button(onClick = {
+                sendImageToServer(imageBitmap!!, ipAddress)
+            }) {
+                Text("Enviar para o Servidor")
+            }
+        }
     }
 }
