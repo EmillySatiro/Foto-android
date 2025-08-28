@@ -20,6 +20,7 @@ import android.content.Intent
 import android.app.Activity
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.ui.Alignment
 
 class MainActivity : ComponentActivity() {
 
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CameraApp() {
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var ipAddress by remember { mutableStateOf("192.168.0.100") }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -63,15 +65,10 @@ fun CameraApp() {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Alinhamento no centro (vertical e horizontal)
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Button(onClick = {
-            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            launcher.launch(intent)
-        }) {
-            Text("Tirar Foto")
-        }
-
         imageBitmap?.let { img ->
             Image(
                 bitmap = img.asImageBitmap(),
@@ -80,6 +77,26 @@ fun CameraApp() {
                     .fillMaxWidth()
                     .height(400.dp)
             )
+            // Espaço entre imagem e campo
+            Spacer(modifier = Modifier.height(16.dp)) 
         }
+
+        OutlinedTextField(
+            value = ipAddress,
+            onValueChange = { ipAddress = it },
+            label = { Text("IP do servidor") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Espaço entre campo e botão
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = {
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            launcher.launch(intent)
+        }) {
+            Text("Tirar Foto e Enviar")
+        }
+
     }
 }
