@@ -20,6 +20,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -88,24 +89,33 @@ suspend fun sendImageToServer(bitmap: Bitmap, ip: String, port: Int) {
     }
 }
 
-fun rotateBitmapIfRequired(context: Context, imageUri: Uri, bitmap: Bitmap): Bitmap {
-    val inputStream = context.contentResolver.openInputStream(imageUri) ?: return bitmap
-    val exif = try {
-        ExifInterface(inputStream)
+// Função unificada para carregar e rotacionar o Bitmap a partir de uma Uri
+fun getRotatedBitmapFromUri(context: Context, imageUri: Uri): Bitmap? {
+    try {
+        val orientation = context.contentResolver.openInputStream(imageUri)?.use { inputStream ->
+            ExifInterface(inputStream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        } ?: ExifInterface.ORIENTATION_NORMAL
+
+        val originalBitmap = context.contentResolver.openInputStream(imageUri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream)
+        } ?: return null
+
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            else -> return originalBitmap
+        }
+
+        return Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true)
+
     } catch (e: IOException) {
         e.printStackTrace()
-        return bitmap
+        return null
     }
-    val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-    val matrix = Matrix()
-    when (orientation) {
-        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-        else -> return bitmap
-    }
-    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
+
 
 @Composable
 fun CameraApp() {
@@ -113,20 +123,32 @@ fun CameraApp() {
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var ipAddress by remember { mutableStateOf("192.168.1.86") }
     var port by remember { mutableStateOf("5001") }
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    
+    // Gatilho para forçar o recarregamento da imagem
+    var triggerLoad by rememberSaveable { mutableStateOf(0) }
     
     val scope = rememberCoroutineScope()
+
+    // Executado sempre que a tela aparece (ou "triggerLoad" mudar)
+    LaunchedEffect(triggerLoad) {
+        photoUri?.let { uri ->
+            scope.launch(Dispatchers.IO) {
+                Log.d("FotoAndroid", "Carregando bitmap da URI: $uri")
+                val loadedBitmap = getRotatedBitmapFromUri(context, uri)
+                withContext(Dispatchers.Main) {
+                    imageBitmap = loadedBitmap
+                }
+            }
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && photoUri != null) {
-            val originalBitmap = BitmapFactory.decodeStream(
-                context.contentResolver.openInputStream(photoUri!!)
-            )
-            imageBitmap = originalBitmap?.let {
-                rotateBitmapIfRequired(context, photoUri!!, it)
-            }
+        if (result.resultCode == Activity.RESULT_OK) {
+            // Faz com que LaunchedEffect recarregue a imagem
+            triggerLoad++
         }
     }
 
@@ -171,6 +193,7 @@ fun CameraApp() {
 
         Button(onClick = {
             val photoFile = createImageFile()
+            // Define o local onde a câmera deve salvar a foto
             photoUri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.provider",
@@ -186,11 +209,12 @@ fun CameraApp() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (imageBitmap != null) {
+        val bitmapToSend = imageBitmap
+        if (bitmapToSend != null) {
             val portInt = port.toIntOrNull() ?: 5001
             Button(onClick = {
                 scope.launch {
-                    sendImageToServer(imageBitmap!!, ipAddress, portInt)
+                    sendImageToServer(bitmapToSend, ipAddress, portInt)
                 }
             }) {
                 Text("Enviar para o Servidor")
