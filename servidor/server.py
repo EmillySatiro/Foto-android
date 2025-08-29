@@ -8,6 +8,17 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from threading import Thread
 
+# Função que garante o recebimento de n bytes do socket
+def recv_all(conn, n):
+    data = b''
+    while len(data) < n:
+        packet = conn.recv(n - len(data))
+        if not packet:
+            return None
+        data += packet
+    return data
+
+
 def criar_diretorio_data():
     if not os.path.exists("data"):
         os.makedirs("data")
@@ -98,23 +109,17 @@ def servidor():
             conn, addr = sock.accept()
             print(f"Conexão estabelecida com {addr}")
             try:
-                tamanho_bytes = conn.recv(4)
-                if not tamanho_bytes or len(tamanho_bytes) < 4:
-                    print("Erro: não recebeu 4 bytes de tamanho da imagem")
+                tamanho_bytes = recv_all(conn, 4)
+                if not tamanho_bytes:
+                    print("Erro: A conexão foi fechada antes de receber o tamanho da imagem.")
                     conn.close()
                     continue
 
                 tamanho = struct.unpack("!I", tamanho_bytes)[0]
 
-                imagem_bytes = b""
-                while len(imagem_bytes) < tamanho:
-                    pacote = conn.recv(tamanho - len(imagem_bytes))
-                    if not pacote:
-                        break
-                    imagem_bytes += pacote
-
-                if len(imagem_bytes) != tamanho:
-                    print("Erro: não recebeu todos os bytes da imagem")
+                imagem_bytes = recv_all(conn, tamanho)
+                if not imagem_bytes or len(imagem_bytes) != tamanho:
+                    print("Erro: não recebeu todos os bytes da imagem.")
                     conn.close()
                     continue
 
