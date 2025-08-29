@@ -33,6 +33,10 @@ import java.io.File
 import java.net.Socket
 import android.app.Activity
 import android.content.Intent
+import android.content.Context
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
+import java.io.IOException
 
 
 class MainActivity : ComponentActivity() {
@@ -82,6 +86,30 @@ fun sendImageToServer(bitmap: Bitmap, ip: String, port: Int = 5001) {
     }
 }
 
+// Função para rotacionar o Bitmap se necessário 🔄
+fun rotateBitmapIfRequired(context: Context, imageUri: Uri, bitmap: Bitmap): Bitmap {
+    val inputStream = context.contentResolver.openInputStream(imageUri) ?: return bitmap
+    val exif: ExifInterface
+    try {
+        exif = ExifInterface(inputStream)
+    } catch (e: IOException) {
+        e.printStackTrace()
+        return bitmap
+    }
+
+    val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    val matrix = Matrix()
+
+    when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+        else -> return bitmap // Não precisa rotacionar
+    }
+
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+}
+
 @Composable
 fun CameraApp() {
     val context = LocalContext.current
@@ -95,10 +123,18 @@ fun CameraApp() {
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && photoUri != null) {
-            val bitmap = BitmapFactory.decodeStream(
+            val originalBitmap = BitmapFactory.decodeStream(
                 context.contentResolver.openInputStream(photoUri!!)
             )
-            imageBitmap = bitmap
+            
+            // Rotaciona o bitmap usando a função que verifica a orientação da imagem (salvo nos metadados dela)
+            imageBitmap = originalBitmap?.let {
+                rotateBitmapIfRequired(context, photoUri!!, it)
+            }
+            // val bitmap = BitmapFactory.decodeStream(
+            //     context.contentResolver.openInputStream(photoUri!!)
+            // )
+            // imageBitmap = bitmap
         }
     }
 
