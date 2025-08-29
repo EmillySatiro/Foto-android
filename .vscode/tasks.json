@@ -2,14 +2,11 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Compilar e Rodar Kotlin",
+			"label": "Atualizar codigo no celular",
 			"type": "shell",
-			"command": "kotlinc ${file} -include-runtime -d ${fileDirname}/program.jar && java -jar ${fileDirname}/program.jar",
+			"command": "./gradlew installDebug",
 			"options": {
-				"shell": {
-					"executable": "/bin/bash",
-					"args": ["-i", "-c"]
-				}
+				"cwd": "${workspaceFolder}/kotlin"
 			},
 			"group": {
 				"kind": "build",
@@ -22,11 +19,12 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "Atualizar codigo no celular",
+			"label": "Rodar servidor",
 			"type": "shell",
-			"command": "./gradlew installDebug",
+			"command": "${workspaceFolder}/servidor/.venv/bin/python",
+			"args": ["server.py"],
 			"options": {
-				"cwd": "${workspaceFolder}/kotlin"
+				"cwd": "${workspaceFolder}/servidor"
 			},
 			"group": {
 				"kind": "build",
